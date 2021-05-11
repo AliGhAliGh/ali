@@ -1,0 +1,74 @@
+var express=require('express');
+var app=express();
+var server =require('http').createServer(app);
+var io=require('socket.io').listen(server);
+var colors=require('colors');
+var USERID=0;
+var clients=[];
+
+app.set('port',process.env.PORT||3000);
+
+
+
+io.on('connection',function(socket){ 
+    var currentuser;
+    socket.on("Connect",function(data){
+        socket.emit("Connected",{name:data.Name});
+        for(var i=0;i<clients.length;i++){
+            socket.emit("Joined",clients[i]);
+        }
+    });
+    socket.on("Play",function(data){
+        USERID++;
+        currentuser={
+            id:USERID,
+            name:data.Name,
+            position:data.Pos,
+            rotation:data.Rot,
+            health:data.Health
+        }         
+         console.log(currentuser.health);
+         clients.push(currentuser);
+         console.log("User ".red+currentuser.name.yellow+" Joined to Game!".blue);
+         socket.emit("Play",currentuser);
+         socket.broadcast.emit("Joined",currentuser);
+    });
+    socket.on("Fire",function(data){
+        currentuser.rotation=data.Rot;
+        socket.broadcast.emit("Fire",{id:currentuser.id,rotation:data.Rot,name:data.Name});
+        socket.emit("Fire2",{id:currentuser.id,rotation:data.Rot,name:data.Name});
+    });
+    socket.on("Move",function(data){
+        currentuser.position=data.Pos;
+        socket.broadcast.emit("Move",currentuser);
+    });
+    socket.on("Rotate",function(data){
+        currentuser.rotation=data.Rot;
+        socket.broadcast.emit("Rotate",currentuser);
+});
+    socket.on("Hit",function(data){
+        console.log(data.Damage);
+        clients[data.ID-1].health-= data.Damage;
+        console.log(clients[data.ID-1].health.yellow);
+    socket.broadcast.emit("Hit",{id:data.ID,name:data.Name});
+});
+    socket.on("disconnect",function(){
+        USERID--;
+      //  console.log(currentuser.name+"Exited!".red);
+        for(var i=0;i<clients.length;i++){
+            if(clients[i]==currentuser){
+                socket.broadcast.emit("Remove",clients[i]);
+                clients.splice(i,1);
+            }
+        }
+});
+});
+
+
+
+server.listen(app.get('port'),function(){    
+console.log("Hello".red);
+    setTimeout(() => {
+    console.log("server is online".green);
+    }, 1000);
+});
